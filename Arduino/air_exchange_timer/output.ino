@@ -10,7 +10,7 @@
 
 //#define MOCKUP_LIGHTS
 
-#define CHAIN_PIN_1 7
+#define CHAIN_PIN_1 2
 
 
  // MOCKUP PIXEL STRIP definition
@@ -69,12 +69,12 @@ void output_show()
   }
 }
 
-void output_play_start_anmiation()
+void output_play_start_animation()
 {
     #ifdef TRACE_OUTPUT
       Serial.println(F("#TRACE_OUTPUT: output_play_start_anmiation  ### first draft ###"));
     #endif
-    for(lx=0;lx<LAMP_COUNT;lx++) {
+    for(int lx=0;lx<LAMP_COUNT;lx++) {
       output_setLightColor(lx,100,0,200);
       delay(200);
     }

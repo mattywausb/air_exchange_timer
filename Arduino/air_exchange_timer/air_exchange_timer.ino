@@ -16,7 +16,7 @@
 
 #define LAMP_COUNT 3
 
-#defin LAMP_FADE_DURATION 1000
+#define LAMP_FADE_DURATION 1000
 
 #define iRED 0
 #define iGREEN 1
@@ -39,8 +39,11 @@ float g_color_palette[][3]={
           {0.1  ,0  ,0.75  }  //11 = dark purple
 };
 
-unsinged long g_mode_start_time=0;
-unsinged long g_mode_last_action_time=0;
+unsigned long g_mode_start_time=0;
+unsigned long g_mode_last_action_time=0;
+
+PictureLamp g_picture_lamp[LAMP_COUNT];
+int g_pic_index=0;
 
 
 /* Control */
@@ -52,7 +55,7 @@ enum PROCESS_MODES {
   TEST_MODE_SCALING,
 };
 
-PROCESS_MODES g_process_mode = IDLE_MODEODE; 
+PROCESS_MODES g_process_mode = IDLE_MODE; 
 
 /* **************** setup ******************************* */
 
@@ -86,7 +89,7 @@ void loop()
    } // switch
 }
 
-/* ========= SHOW_MODE ======== */
+/* ========= IDLE_MODE ======== */
 void enter_IDLE_MODE()
 {
     #ifdef TRACE_MODES
@@ -113,9 +116,9 @@ void enter_IDLE_MODE()
 
 void process_IDLE_MODE()
 {
-    if(input_button_0_GotReleased()) 
+    if(input_button_0_IsPressed()) 
     {
-      if(input_getLastPressDuration()>1500)   // Release after Long press
+      if(input_getCurrentPressDuration()>1500)   // Long press
         enter_COUNTDOWN_MODE();
       return;
     }
@@ -156,14 +159,9 @@ void enter_COUNTDOWN_MODE()
 
 void process_COUNTDOWN_MODE()
 {
-    if(input_button_0_GotReleased()) 
+    if(input_button_0_IsPressed()) 
     {
-       if(input_getLastPressDuration()>10000)   // Release after 10 second press
-       {
-        enter_TEST_MODE_FADE_SOLO();
-        return;
-       }
-      if(input_getLastPressDuration()>1500)   // Release after Long press
+      if(input_getCurrentPressDuration()>1500)   // Long press
         enter_COUNTDOWN_MODE();
       return;
     }
@@ -204,11 +202,15 @@ void enter_WINDOW_OPEN_MODE()
 
 void process_WINDOW_OPEN_MODE()
 {
+    if(input_button_0_IsPressed()) 
+    {
+      if(input_getCurrentPressDuration()>1500)   // Long press
+        enter_COUNTDOWN_MODE();
+      return;
+    }
     if(input_button_0_GotReleased()) 
     {
-      if(input_getLastPressDuration()>1500)   // Release after Long press
-        enter_COUNTDOWN_MODE();
-      else
+      if(input_getLastPressDuration()<=1500)   // Release after Long press
         enter_IDLE_MODE();
       return;
     }
