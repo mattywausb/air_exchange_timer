@@ -10,7 +10,7 @@
 
 //#define MOCKUP_LIGHTS
 
-#define CHAIN_PIN_1 2
+#define CHAIN_PIN_1 3
 
 
 
@@ -18,7 +18,7 @@
 #define NUMCHAINS 1
 #define NUMPIXELS 3
 #define PIXEL_BRIGHTNESS 255
-Adafruit_NeoPixel light_chain[1]={ Adafruit_NeoPixel(NUMPIXELS, CHAIN_PIN_1, NEO_RGB + NEO_KHZ400)};
+Adafruit_NeoPixel light_chain[1]={ Adafruit_NeoPixel(NUMPIXELS, CHAIN_PIN_1, NEO_RGB + NEO_KHZ800)};
 
 /* This map translates the picture light index in to the physical light index 
    an must be adapted to the current physical setup

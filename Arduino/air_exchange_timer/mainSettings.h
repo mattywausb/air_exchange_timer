@@ -1,4 +1,4 @@
-#define TRACE_ON 
+//#define TRACE_ON 
 
 
 // Workaround to propagate output function to cpp code

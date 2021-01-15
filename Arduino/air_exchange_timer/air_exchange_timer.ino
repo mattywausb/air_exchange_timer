@@ -2,7 +2,7 @@
 #include "picturelamp.h"
 #include "mainSettings.h"
 
-#define DEBUG_ON
+//#define DEBUG_ON
 
 #ifdef TRACE_ON
   #define TRACE_MODES
@@ -12,37 +12,37 @@
 #ifndef DEBUG_ON
     #define DEBUG_TIME_SPEED 1
     #define SECONDS_TO_MEASURE 300
-    #define LAMP_SWITCH_DURATION 333
+    #define LAMP_SWITCH_DURATION 150
+    #define LAMP_FADE_DURATION 400
 #else
     #define DEBUG_TIME_SPEED 4
-    #define SECONDS_TO_MEASURE 60
-    #define LAMP_SWITCH_DURATION 1000
+    #define SECONDS_TO_MEASURE 45
+    #define LAMP_SWITCH_DURATION 150
+    #define LAMP_FADE_DURATION 400
 #endif
 
-#define LAMP_COUNT 3
+#define WINDOW_ANIMATION_PULSE_DURATION 3000
+#define WINDOW_ANIMATION_FADE_DURATION  2800
+#define IDLE_START_FADE_DURATION 500
 
-#define LAMP_FADE_DURATION 1000
-#define LAMP_SWITCH_DURATION 333
+
+#define LAMP_COUNT 3
 
 #define iRED 0
 #define iGREEN 1
 #define iBLUE 2
 
-#define SECONDS_PER_DAY 86400
-
-
-
-
+#define ACTIVTATION_PRESS_TIME 1000
 
 struct catalog {
   const int seconds_border;
   const byte color_index_from;
   const byte color_index_to;
 } const time_color_map[] = {
-  {160,3,3},  // >= 2:40
-  {80,3,4},   // >= 1:40 from red to orange
-  {40,4,5},   // >= 0:40 from orange to yellow
-  {0,5,0}    // >= 0 from yellow to black
+  {160,4,4},  // >= 2:40
+  {80,4,5},   // >= 1:40 from red to orange
+  {40,5,6},   // >= 0:40 from orange to yellow
+  {0,6,0}    // >= 0 from yellow to black
 };
 
 #define TIME_COLOR_MAP_COUNT 4
@@ -85,8 +85,13 @@ void setup() {
   input_setup();
   delay(700); // wait for chains to power up completetly
 
+  input_switches_scan_tick();
+ 
+  input_switches_scan_tick();
+  if(input_button_0_IsPressed()) { enter_TEST_MODE_FADE_SOLO(); return;}
   play_power_on_animation();
   enter_IDLE_MODE();
+  //enter_WINDOW_OPEN_MODE();
 }
 
 /* **************** LOOP ******************************* */
@@ -117,30 +122,30 @@ void enter_IDLE_MODE()
     digitalWrite(LED_BUILTIN, false);
     
     for(int i=0;i<LAMP_COUNT;i++) 
-      {
-         g_picture_lamp[i].setCurrentColor(0.0,0.0,0.0); // All Lamps off
-         g_picture_lamp[i].updateOutput(i);
-       }
-    output_show();
-
+    {
+         g_picture_lamp[i].setTargetColor(PL_COLOR_BLACK); // All Lamps off
+         g_picture_lamp[i].startTransition(IDLE_START_FADE_DURATION); // Smoothly
+     }
     g_mode_start_time=millis();
-    g_mode_last_action_time=g_mode_start_time;
+    g_mode_last_action_time=1; // Using this as flag, if some animation is pending
 }
 
 void process_IDLE_MODE()
 {
     if(input_button_0_IsPressed()) 
     {
-      if(input_getCurrentPressDuration()>1500)   // Long press
+      if(input_getCurrentPressDuration()>ACTIVTATION_PRESS_TIME)   // Long press
         enter_COUNTDOWN_MODE();
       return;
     }
     
-    unsigned long current_time=millis();
-    
-    if(current_time-g_mode_last_action_time>1000) {
-      g_mode_last_action_time=current_time;
-      digitalWrite(LED_BUILTIN, (current_time/1000)%2);
+    if(g_mode_last_action_time>0) {  // Transition still open
+      g_mode_last_action_time=0;
+      for(int i=0;i<LAMP_COUNT;i++) 
+      {
+         if(!g_picture_lamp[i].updateOutput(i)) g_mode_last_action_time=1;
+      }
+      output_show();
     }
 }
 
@@ -178,9 +183,10 @@ void process_COUNTDOWN_MODE()
 {
     if(input_button_0_IsPressed()) 
     {
-      if(input_getCurrentPressDuration()>1500)   // Long press
+      if(input_getCurrentPressDuration()>ACTIVTATION_PRESS_TIME) {  // Long press
         enter_COUNTDOWN_MODE();
-      return;
+        return;
+      }
     }
 
     unsigned long current_time=millis();
@@ -215,6 +221,7 @@ void process_COUNTDOWN_MODE()
             Serial.print(F(" FR: ")); Serial.println(time_color_map[g_time_color_map_position].color_index_from);
          #endif 
       }
+      
       g_picture_lamp[g_current_lamp_index].setTargetColor(0.0,0.0,0.0);
       g_picture_lamp[g_current_lamp_index].startTransition(LAMP_FADE_DURATION);
       if(++g_current_lamp_index>=LAMP_COUNT) { 
@@ -249,27 +256,42 @@ void enter_WINDOW_OPEN_MODE()
     
     for(int i=0;i<LAMP_COUNT;i++)  /* Initialize all lamps */
     {
-         g_picture_lamp[i].setTargetColor(0,1,1);
-         g_picture_lamp[i].endTransition();
-         g_picture_lamp[i].updateOutput(i);
+         g_picture_lamp[i].setTargetColor(PL_COLOR_CYAN);
+         g_picture_lamp[i].startTransition(WINDOW_ANIMATION_FADE_DURATION);
     }
-    output_show();
 }
 
 void process_WINDOW_OPEN_MODE()
 {
     if(input_button_0_IsPressed()) 
     {
-      if(input_getCurrentPressDuration()>1500)   // Long press
+      if(input_getCurrentPressDuration()>ACTIVTATION_PRESS_TIME) {   // Long press
         enter_COUNTDOWN_MODE();
       return;
+      }
     }
     if(input_button_0_GotReleased()) 
     {
-      if(input_getLastPressDuration()<=1500)   // Release after Long press
+      if(input_getLastPressDuration()<=ACTIVTATION_PRESS_TIME)   // Release after Long press
         enter_IDLE_MODE();
       return;
     }
+    unsigned long current_time=millis();
+    if((current_time-g_mode_last_action_time)>WINDOW_ANIMATION_PULSE_DURATION) { // Reacitvate lamps
+        for(int i=0;i<LAMP_COUNT;i++) {
+         g_mode_last_action_time=current_time;
+         g_picture_lamp[i].setCurrentColor(PL_COLOR_BLACK);
+         g_picture_lamp[i].setTargetColor(PL_COLOR_CYAN);
+         g_picture_lamp[i].startTransition(WINDOW_ANIMATION_FADE_DURATION);
+        }
+    }
+    
+    // Finally calculate and propagate new lamp values
+    for(int i=0;i<LAMP_COUNT;i++) 
+    {
+         g_picture_lamp[i].updateOutput(i);
+    }
+    output_show();
 } 
    
 
@@ -297,7 +319,7 @@ void process_TEST_MODE_FADE_SOLO()
 
     if(input_button_0_GotReleased()) 
     {
-      if(input_getLastPressDuration()>1500)   // Release after Long press
+      if(input_getLastPressDuration()>ACTIVTATION_PRESS_TIME)   // Release after Long press
       {       
         enter_TEST_MODE_SCALING();
         return;
@@ -334,16 +356,17 @@ void process_TEST_MODE_SCALING()
     byte blue=(current_time/10)%255;
 
      if(input_button_0_GotReleased()) {
-        if(input_getLastPressDuration()>5000)   // Release after Long press
+        if(input_getLastPressDuration()>(ACTIVTATION_PRESS_TIME*3))   // Release after Long press
         {       
           enter_IDLE_MODE();
           return;
         }
-        if(input_getLastPressDuration()>1500)   // Release after Long press
+        if(input_getLastPressDuration()>ACTIVTATION_PRESS_TIME)   // Release after Long press
         {       
           enter_TEST_MODE_FADE_SOLO();
           return;
         }
+        if(++g_current_lamp_index>=LAMP_COUNT)g_current_lamp_index=0;
     }
     
     for(int i=0;i<LAMP_COUNT;i++) {
@@ -354,16 +377,22 @@ void process_TEST_MODE_SCALING()
 }
 
 
-/* ******************** Fix Animations  *************** */
+/* ******************** Fix programmed animations  *************** */
 void play_power_on_animation(){
     #ifdef TRACE_ON
       Serial.println(F("TRACE_ON> play_power_on_animation  ### first draft ###"));
     #endif
     for(int lmp=0;lmp<LAMP_COUNT;lmp++) {
-      output_setLampColor(lmp,100,100,200);
+      output_setLampColor(lmp,100,100,100);
+      output_show();
       delay(200);
     }
     delay(500);
+    for(int lmp=0;lmp<LAMP_COUNT;lmp++) {
+      output_setLampColor(lmp,0,0,0);
+      output_show();
+      delay(100);
+    }
 }
 
 void play_start_countdown_animation()
@@ -373,9 +402,10 @@ void play_start_countdown_animation()
     #endif
     for(int lmp=0;lmp<LAMP_COUNT;lmp++) {
       output_setLampColor(lmp,100,0,200);
-      delay(200);
+      output_show();
+      delay(100);
     }
-    delay(500);
+    delay(200);
 }
 
 

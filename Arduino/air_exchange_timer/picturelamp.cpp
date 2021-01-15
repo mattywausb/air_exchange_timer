@@ -20,6 +20,7 @@ float picturelamp_color_palette[][3]={
           {1    ,0.0 ,0  },  //4 = red
           {1    ,0.3 ,0  },  //5 = orange
           {1    ,0.7 ,0  },  //6 = yellow
+          {0.2  ,1   ,0  },  //7 = green
 };
 
 PictureLamp::PictureLamp()
@@ -31,7 +32,7 @@ PictureLamp::PictureLamp()
 }
 
 
-void PictureLamp::updateOutput(byte light_index)
+bool PictureLamp::updateOutput(byte light_index)
 {
    float interpolated_red, interpolated_green, interpolated_blue;
    float normalized_transition_point;
@@ -41,7 +42,7 @@ void PictureLamp::updateOutput(byte light_index)
       Serial.print(F("TRACE_PICTURELAMP_OPERATIONS_HIGH:updateOutput >"));
       Serial.println(light_index);      
    #endif
-   if(is_in_transition())
+   if(is_transition_in_progess())
    {
     transition_time=millis()-start_transition_time;   
     if(transition_time<transition_duration) {
@@ -54,7 +55,7 @@ void PictureLamp::updateOutput(byte light_index)
     }
    }
  
-   if(!is_in_transition())
+   if(!is_transition_in_progess())
    {
         interpolated_red=current_red/FLOAT_CONVERSION;
         interpolated_green=current_green/FLOAT_CONVERSION;
@@ -79,6 +80,8 @@ void PictureLamp::updateOutput(byte light_index)
                   static_cast<int>(MAX_INTENSITY*interpolated_red),
                   static_cast<int>(MAX_INTENSITY*interpolated_green),
                   static_cast<int>(MAX_INTENSITY*interpolated_blue));
+                  
+   return is_transition_finished();
 }
 
 void PictureLamp::setCurrentColor(byte palette_index)
@@ -103,6 +106,30 @@ void PictureLamp::setTargetColor(byte palette_index)
 
 void PictureLamp::setTargetColor(float red, float green, float blue)
 {
+  if(is_transition_in_progess())  // Save state of current running transition as new startpoint
+  {
+    float normalized_transition_point;
+    float transition_time;
+    float interpolated_red, interpolated_green, interpolated_blue;
+    transition_time=millis()-start_transition_time;   
+    if(transition_time<transition_duration) {
+        normalized_transition_point=transition_time/transition_duration;
+        interpolated_red=current_red/FLOAT_CONVERSION-(current_red-target_red)/FLOAT_CONVERSION*normalized_transition_point;
+        interpolated_green=current_green/FLOAT_CONVERSION-(current_green-target_green)/FLOAT_CONVERSION*normalized_transition_point;
+        interpolated_blue=current_blue/FLOAT_CONVERSION-(current_blue-target_blue)/FLOAT_CONVERSION*normalized_transition_point;
+        if(interpolated_red>1.0) interpolated_red=1.0;
+        if(interpolated_green>1.0) interpolated_green=1.0;
+        if(interpolated_blue>1.0) interpolated_blue=1.0;
+        current_red=interpolated_red*FLOAT_CONVERSION;
+        current_green=interpolated_green*FLOAT_CONVERSION;
+        current_blue=interpolated_blue*FLOAT_CONVERSION;
+    } else {
+      current_red=target_red;
+      current_red=target_green;
+      current_red=target_blue;
+    }
+  }
+  
   target_red=red*FLOAT_CONVERSION;
   target_green=green*FLOAT_CONVERSION;
   target_blue=blue*FLOAT_CONVERSION;
@@ -125,6 +152,7 @@ void PictureLamp::startTransition(unsigned long duration)
     Serial.print(F("TRACE_PICTURELAMP_OPERATIONS::startTransition for "));
     Serial.println(duration);
   #endif
+   
   transition_duration=duration;
   start_transition_time=millis();
 }
@@ -144,12 +172,12 @@ void PictureLamp::endTransition() {
 /* ---- State information ---- */
 
 
-bool PictureLamp::is_in_transition() 
+bool PictureLamp::is_transition_in_progess() 
 {
   return (transition_type!=TT_NONE && transition_duration>0.0);
 }
-bool PictureLamp::is_transition_pending() 
+bool PictureLamp::is_transition_finished() 
 {
-  return (transition_type!=TT_NONE);
+  return (transition_type==TT_NONE);
 }
 

@@ -14,7 +14,7 @@ class PictureLamp
       PictureLamp();
 
       /* ---- Operations ---- */
-      void updateOutput(byte light_index);          // Calculate current color and send to logical pixel
+      bool updateOutput(byte light_index);          // Calculate current color and send to logical pixel, return true if transition is finished
       void setCurrentColor(float red, float green, float blue); // Values from 0 to 1
       void setCurrentColor(byte palette_index); // Values from 0 to 1
       void setTargetColor(float red, float green, float blue);  // Values from 0 to 1
@@ -23,8 +23,8 @@ class PictureLamp
       void endTransition();                         // Skip left over transition operation to target values
 
       /* ---- State information ---- */
-      bool is_in_transition();
-      bool is_transition_pending();
+      bool is_transition_in_progess();
+      bool is_transition_finished();
       transition_type_t getTransitionType() {return transition_type;};
 
   protected:
