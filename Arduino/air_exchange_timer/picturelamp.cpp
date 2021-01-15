@@ -12,6 +12,16 @@
 #define FLOAT_CONVERSION 10000.0
 #define MAX_INTENSITY 210.0
 
+float picturelamp_color_palette[][3]={
+          {0    ,0   ,0  },  //0 = black
+          {1    ,1   ,1  },  //1 = white
+          {0.8  ,0   ,0.8},  //2 = pink
+          {0    ,0.8 ,0.8},  //3 = cyan
+          {1    ,0.0 ,0  },  //4 = red
+          {1    ,0.3 ,0  },  //5 = orange
+          {1    ,0.7 ,0  },  //6 = yellow
+};
+
 PictureLamp::PictureLamp()
 {
   current_red=current_green=current_blue=
@@ -65,10 +75,15 @@ void PictureLamp::updateOutput(byte light_index)
     Serial.println(interpolated_blue);
  #endif
 
-   output_setLightColor(light_index,
+   output_setLampColor(light_index,
                   static_cast<int>(MAX_INTENSITY*interpolated_red),
                   static_cast<int>(MAX_INTENSITY*interpolated_green),
                   static_cast<int>(MAX_INTENSITY*interpolated_blue));
+}
+
+void PictureLamp::setCurrentColor(byte palette_index)
+{
+  setCurrentColor(picturelamp_color_palette[palette_index][0],picturelamp_color_palette[palette_index][1],picturelamp_color_palette[palette_index][2]);
 }
 
 void PictureLamp::setCurrentColor(float red, float green, float blue)
@@ -78,6 +93,13 @@ void PictureLamp::setCurrentColor(float red, float green, float blue)
   current_blue=blue*FLOAT_CONVERSION;
   transition_type=TT_NONE;
 }
+
+
+void PictureLamp::setTargetColor(byte palette_index)
+{
+  setTargetColor(picturelamp_color_palette[palette_index][0],picturelamp_color_palette[palette_index][1],picturelamp_color_palette[palette_index][2]);
+}
+
 
 void PictureLamp::setTargetColor(float red, float green, float blue)
 {

@@ -13,8 +13,6 @@
 #define CHAIN_PIN_1 2
 
 
- // MOCKUP PIXEL STRIP definition
- 
 
 
 #define NUMCHAINS 1
@@ -25,7 +23,7 @@ Adafruit_NeoPixel light_chain[1]={ Adafruit_NeoPixel(NUMPIXELS, CHAIN_PIN_1, NEO
 /* This map translates the picture light index in to the physical light index 
    an must be adapted to the current physical setup
  */
-byte light_index_map[3]={ 0, 1,2 };
+byte output_lamp_to_pixel_map[3]={ 0, 1,2 };
 
 
 void output_setup()
@@ -37,17 +35,14 @@ void output_setup()
   }
 }
 
-/* output_setLightColor takes RGB values, from 0,0,0 up to 255,255,255 */
-void output_setLightColor(byte index,int red,int green, int blue)
+/* output_setLampColor (Lamp=logical lamp) takes RGB values, from 0,0,0 up to 255,255,255 */
+void output_setLampColor(byte lamp_index,int red,int green, int blue)
 {
-  byte light_index=light_index_map[index];
-  byte chain_index=light_index/NUMPIXELS;
-  byte pixel_index=light_index%NUMPIXELS;
-  light_chain[chain_index].setPixelColor(pixel_index, light_chain[chain_index].Color(red,green,blue));
+  output_setPixelColor(output_lamp_to_pixel_map[lamp_index], red, green, blue);
 }
 
-/* output_setLightColorUnmapped takes RGB values, from 0,0,0 up to 255,255,255 */
-void output_setLightColorUnmapped(byte index,int red,int green, int blue)
+/* output_setPixelColor takes RGB values, from 0,0,0 up to 255,255,255 */
+void output_setPixelColor(byte index,int red,int green, int blue)
 {
   byte light_index=index;
   byte chain_index=light_index/NUMPIXELS;
@@ -61,7 +56,7 @@ void output_setLightColorUnmapped(byte index,int red,int green, int blue)
 void output_show()
 {
   #ifdef TRACE_OUTPUT_HIGH
-      Serial.println(F(">output_show"));
+      Serial.println(F("TRACE_OUTPUT_HIGH>output_show"));
   #endif
   for (int i=0;i<NUMCHAINS;i++) 
   {
@@ -69,16 +64,5 @@ void output_show()
   }
 }
 
-void output_play_start_animation()
-{
-    #ifdef TRACE_OUTPUT
-      Serial.println(F("#TRACE_OUTPUT: output_play_start_anmiation  ### first draft ###"));
-    #endif
-    for(int lx=0;lx<LAMP_COUNT;lx++) {
-      output_setLightColor(lx,100,0,200);
-      delay(200);
-    }
-    delay(500);
-}
 
 

@@ -2,17 +2,21 @@
 #include "picturelamp.h"
 #include "mainSettings.h"
 
-
-//#define DEBUG_ON
+#define DEBUG_ON
 
 #ifdef TRACE_ON
-//#define TRACE_LOGIC
-
-#define TRACE_MODES
-//#define TRACE_TIMING
-#define TRACE_CLOCK
-#define TRACE_CLOCK_TIME
+  //#define TRACE_LOGIC
+  #define TRACE_MODES
+  //#define TRACE_TIMING
+  #define TRACE_CLOCK
+  #define TRACE_CLOCK_TIME
 #endif 
+
+#ifndef DEBUG_ON
+    #define DEBUG_REDUCTION 1
+#else
+    #define DEBUG_REDUCTION 4
+#endif
 
 #define LAMP_COUNT 3
 
@@ -24,26 +28,29 @@
 
 #define SECONDS_PER_DAY 86400
 
-float g_color_palette[][3]={
-          {0  ,0  ,0  },  //0 = black
-          {1  ,0.7,0  },  //1 = yellow
-          {0  ,0.8  ,0.8  },  //2 = cyan
-          {0  ,0.5,0.08}, //3 = mid green
-          {0.2,0.1,0 },  //4 = dark brown
-          {1,0.0,0  },  //5 = red
-          {0  ,0  ,0.8},  //6 = blue
-          {1  ,1  ,1  },  //7 = white
-          {0.8  ,0  ,0.8  },  //8 = pink
-          {1  ,0.3,0  },  //9 = orange
-          {0  ,1  ,0  },  // 10 =bright green
-          {0.1  ,0  ,0.75  }  //11 = dark purple
+
+
+#define SECONDS_TO_MEASURE 300
+
+struct catalog {
+  const int seconds_left;
+  const byte color_index_from;
+  const byte color_index_to;
+} const time_color_map[] = {
+  {160,3,3},  // >= 2:40
+  {80,3,4},   // >= 1:40 from red to orange
+  {40,4,5},   // >= 0:40 from orange to yellow
+  {40,5,0}    // >= 0 from yellow to black
 };
+
+#define TIME_COLOR_MAP_COUNT 4
 
 unsigned long g_mode_start_time=0;
 unsigned long g_mode_last_action_time=0;
 
 PictureLamp g_picture_lamp[LAMP_COUNT];
 int g_pic_index=0;
+
 
 
 /* Control */
@@ -64,6 +71,9 @@ void setup() {
     char compile_signature[] = "--- START (Build: " __DATE__ " " __TIME__ ") ---";   
     Serial.begin(9600);
     Serial.println(compile_signature); 
+    #ifdef DEBUG_ON
+          Serial.println(F("TRACE_ON> !!! DEBUG MODE IS ACTIVE !!!"));
+    #endif
   #endif
   
   pinMode(LED_BUILTIN, OUTPUT);
@@ -72,6 +82,7 @@ void setup() {
   input_setup();
   delay(700); // wait for chains to power up completetly
 
+  play_power_on_animation();
   enter_IDLE_MODE();
 }
 
@@ -93,7 +104,7 @@ void loop()
 void enter_IDLE_MODE()
 {
     #ifdef TRACE_MODES
-      Serial.print(F("#IDLE_MODE: "));
+      Serial.print(F("TRACE_MODES> #IDLE_MODE: "));
       Serial.print(freeMemory());
       Serial.print(F(" bytes free memory. "));
       Serial.print(millis()/1000);
@@ -136,7 +147,7 @@ void process_IDLE_MODE()
 void enter_COUNTDOWN_MODE()
 {
     #ifdef TRACE_MODES
-      Serial.print(F("#COUNTDOWN_MODE:start "));
+      Serial.print(F("TRACE_MODES> #COUNTDOWN_MODE: second="));
       Serial.println(millis()/1000);
     #endif
     g_process_mode=COUNTDOWN_MODE;
@@ -146,7 +157,7 @@ void enter_COUNTDOWN_MODE()
     g_mode_start_time=millis();
     g_mode_last_action_time=g_mode_start_time;
 
-    output_play_start_animation();
+    play_start_countdown_animation();
     for(int i=0;i<LAMP_COUNT;i++) 
     {
          g_picture_lamp[i].setCurrentColor(1.0,0.0,0.0); // red
@@ -183,7 +194,7 @@ void process_COUNTDOWN_MODE()
 void enter_WINDOW_OPEN_MODE() 
 {
     #ifdef TRACE_MODES
-      Serial.println(F("#WINDOW_OPEN_MODE"));
+      Serial.println(F("TRACE_MODES> #WINDOW_OPEN_MODE"));
     #endif
     g_process_mode=WINDOW_OPEN_MODE;
     digitalWrite(LED_BUILTIN, false);
@@ -222,13 +233,13 @@ void process_WINDOW_OPEN_MODE()
 void enter_TEST_MODE_FADE_SOLO() 
 {
     #ifdef TRACE_MODES
-      Serial.println(F("#TEST_MODE_FADE_SOLO"));
+      Serial.println(F("TRACE_MODES> #TEST_MODE_FADE_SOLO"));
     #endif
     g_process_mode=TEST_MODE_FADE_SOLO;
     input_IgnoreUntilRelease();
     digitalWrite(LED_BUILTIN, false);
     g_pic_index=0;
-    for(int i=0;i<LAMP_COUNT;i++)  output_setLightColorUnmapped(i,0,0,0);  // shut down all lights
+    for(int i=0;i<LAMP_COUNT;i++)  output_setPixelColor(i,0,0,0);  // shut down all lights
     output_show();
 }
 
@@ -246,11 +257,11 @@ void process_TEST_MODE_FADE_SOLO()
         enter_TEST_MODE_SCALING();
         return;
       }
-      output_setLightColorUnmapped(g_pic_index,0,0,0); // Shut down current light
+      output_setPixelColor(g_pic_index,0,0,0); // Shut down current light
       if(++g_pic_index>=LAMP_COUNT) g_pic_index=0;
     }
 
-    output_setLightColorUnmapped(g_pic_index,red,green,blue);
+    output_setPixelColor(g_pic_index,red,green,blue);
     output_show();
 }
 
@@ -260,13 +271,13 @@ void process_TEST_MODE_FADE_SOLO()
 void enter_TEST_MODE_SCALING() 
 {
     #ifdef TRACE_MODES
-      Serial.println(F("#TEST_MODE_SCALING"));
+      Serial.println(F("TRACE_MODES> #TEST_MODE_SCALING"));
     #endif
     g_process_mode=TEST_MODE_SCALING;
     input_IgnoreUntilRelease();
     digitalWrite(LED_BUILTIN, false);
     g_pic_index=0;
-    for(int i=0;i<LAMP_COUNT;i++)  output_setLightColorUnmapped(i,0,0,0);  // shut down all lights
+    for(int i=0;i<LAMP_COUNT;i++)  output_setPixelColor(i,0,0,0);  // shut down all lights
     output_show();
 }
 
@@ -291,11 +302,37 @@ void process_TEST_MODE_SCALING()
     }
     
     for(int i=0;i<LAMP_COUNT;i++) {
-      if (i<=g_pic_index) output_setLightColorUnmapped(i,red,green,blue); // Shut down current light
-      else output_setLightColorUnmapped(i,0,0,0); 
+      if (i<=g_pic_index) output_setPixelColor(i,red,green,blue); // Shut down current light
+      else output_setPixelColor(i,0,0,0); 
     }
     output_show();
 }
+
+
+/* ******************** Fix Animations  *************** */
+void play_power_on_animation(){
+    #ifdef TRACE_ON
+      Serial.println(F("TRACE_ON> play_power_on_animation  ### first draft ###"));
+    #endif
+    for(int lmp=0;lmp<LAMP_COUNT;lmp++) {
+      output_setLampColor(lmp,100,100,200);
+      delay(200);
+    }
+    delay(500);
+}
+
+void play_start_countdown_animation()
+{
+    #ifdef TRACE_OUTPUT
+      Serial.println(F("TRACE_ON> output_play_start_anmiation  ### first draft ###"));
+    #endif
+    for(int lmp=0;lmp<LAMP_COUNT;lmp++) {
+      output_setLampColor(lmp,100,0,200);
+      delay(200);
+    }
+    delay(500);
+}
+
 
 /* ******************** Memory Helper *************** */
  

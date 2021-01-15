@@ -3,6 +3,11 @@
 
 enum transition_type_t {TT_NONE,TT_ON,TT_OFF,TT_BLEND};
 
+#define PL_COLOR_BLACK 0
+#define PL_COLOR_CYAN  3
+#define PL_COLOR_PINK  2
+#define PL_COLOR_WHITE 1
+
 class PictureLamp
 {
   public:
@@ -11,7 +16,9 @@ class PictureLamp
       /* ---- Operations ---- */
       void updateOutput(byte light_index);          // Calculate current color and send to logical pixel
       void setCurrentColor(float red, float green, float blue); // Values from 0 to 1
+      void setCurrentColor(byte palette_index); // Values from 0 to 1
       void setTargetColor(float red, float green, float blue);  // Values from 0 to 1
+      void setTargetColor(byte palette_index); // Values from 0 to 1
       void startTransition(unsigned long duration);   // duration in millis
       void endTransition();                         // Skip left over transition operation to target values
 
