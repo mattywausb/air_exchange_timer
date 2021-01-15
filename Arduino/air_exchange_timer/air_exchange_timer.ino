@@ -5,22 +5,24 @@
 #define DEBUG_ON
 
 #ifdef TRACE_ON
-  //#define TRACE_LOGIC
   #define TRACE_MODES
-  //#define TRACE_TIMING
-  #define TRACE_CLOCK
-  #define TRACE_CLOCK_TIME
+  #define TRACE_COUNTDOWN
 #endif 
 
 #ifndef DEBUG_ON
-    #define DEBUG_REDUCTION 1
+    #define DEBUG_TIME_SPEED 1
+    #define SECONDS_TO_MEASURE 300
+    #define LAMP_SWITCH_DURATION 333
 #else
-    #define DEBUG_REDUCTION 4
+    #define DEBUG_TIME_SPEED 4
+    #define SECONDS_TO_MEASURE 60
+    #define LAMP_SWITCH_DURATION 1000
 #endif
 
 #define LAMP_COUNT 3
 
 #define LAMP_FADE_DURATION 1000
+#define LAMP_SWITCH_DURATION 333
 
 #define iRED 0
 #define iGREEN 1
@@ -30,26 +32,27 @@
 
 
 
-#define SECONDS_TO_MEASURE 300
+
 
 struct catalog {
-  const int seconds_left;
+  const int seconds_border;
   const byte color_index_from;
   const byte color_index_to;
 } const time_color_map[] = {
   {160,3,3},  // >= 2:40
   {80,3,4},   // >= 1:40 from red to orange
   {40,4,5},   // >= 0:40 from orange to yellow
-  {40,5,0}    // >= 0 from yellow to black
+  {0,5,0}    // >= 0 from yellow to black
 };
 
 #define TIME_COLOR_MAP_COUNT 4
 
 unsigned long g_mode_start_time=0;
 unsigned long g_mode_last_action_time=0;
+int g_time_color_map_position=0;
 
 PictureLamp g_picture_lamp[LAMP_COUNT];
-int g_pic_index=0;
+int g_current_lamp_index=0;
 
 
 
@@ -106,9 +109,8 @@ void enter_IDLE_MODE()
     #ifdef TRACE_MODES
       Serial.print(F("TRACE_MODES> #IDLE_MODE: "));
       Serial.print(freeMemory());
-      Serial.print(F(" bytes free memory. "));
-      Serial.print(millis()/1000);
-      Serial.println(F(" seconds uptime"));
+      Serial.print(F(" bytes free memory. uptime="));
+      Serial.println(millis()/1000);
     #endif
     g_process_mode=IDLE_MODE;
     input_IgnoreUntilRelease();
@@ -147,7 +149,7 @@ void process_IDLE_MODE()
 void enter_COUNTDOWN_MODE()
 {
     #ifdef TRACE_MODES
-      Serial.print(F("TRACE_MODES> #COUNTDOWN_MODE: second="));
+      Serial.print(F("TRACE_MODES> #COUNTDOWN_MODE: uptime="));
       Serial.println(millis()/1000);
     #endif
     g_process_mode=COUNTDOWN_MODE;
@@ -156,11 +158,15 @@ void enter_COUNTDOWN_MODE()
     digitalWrite(LED_BUILTIN, false);
     g_mode_start_time=millis();
     g_mode_last_action_time=g_mode_start_time;
+    g_time_color_map_position=0;
+    g_current_lamp_index=0;
 
     play_start_countdown_animation();
+
+    //Set all lamps to first color and trigger Fade
     for(int i=0;i<LAMP_COUNT;i++) 
     {
-         g_picture_lamp[i].setCurrentColor(1.0,0.0,0.0); // red
+         g_picture_lamp[i].setCurrentColor(time_color_map[g_time_color_map_position].color_index_to);
          g_picture_lamp[i].setTargetColor(0.0,0.0,0.0);
          g_picture_lamp[i].startTransition(LAMP_FADE_DURATION);
          g_picture_lamp[i].updateOutput(i);
@@ -177,12 +183,51 @@ void process_COUNTDOWN_MODE()
       return;
     }
 
+    unsigned long current_time=millis();
+    int seconds_left=SECONDS_TO_MEASURE-((current_time-g_mode_start_time)/1000);
+    if (seconds_left<=0) {
+      enter_WINDOW_OPEN_MODE();
+      return;
+    }
+   
+    while(seconds_left<time_color_map[g_time_color_map_position].seconds_border/DEBUG_TIME_SPEED) g_time_color_map_position++;
+
+    if((current_time-g_mode_last_action_time)>LAMP_SWITCH_DURATION) { // Acitvate next lamp
+      g_mode_last_action_time=current_time;
+      int seconds_left_on_map_position  =seconds_left - time_color_map[g_time_color_map_position].seconds_border/DEBUG_TIME_SPEED;
+      int section_length = g_time_color_map_position==0?1000: (time_color_map[g_time_color_map_position-1].seconds_border/DEBUG_TIME_SPEED -time_color_map[g_time_color_map_position].seconds_border/DEBUG_TIME_SPEED)/ LAMP_COUNT;
+      #ifdef TRACE_COUNTDOWN
+        Serial.print(F("TRACE_COUNTDOWN> seconds_left="));Serial.print(seconds_left);
+        Serial.print(F(" seconds_left_on_map_position="));Serial.print(seconds_left_on_map_position);
+        Serial.print(F(" section_length="));Serial.print(section_length);
+        Serial.print(F(" map_position="));Serial.print(g_time_color_map_position);
+        Serial.print(F(" current_lamp="));Serial.print(g_current_lamp_index);
+      #endif
+      
+      if(seconds_left_on_map_position<section_length*g_current_lamp_index) {
+         g_picture_lamp[g_current_lamp_index].setCurrentColor(time_color_map[g_time_color_map_position].color_index_to);
+         #ifdef TRACE_COUNTDOWN
+            Serial.print(F(" TO: ")); Serial.println(time_color_map[g_time_color_map_position].color_index_to);
+         #endif 
+      }else {
+         g_picture_lamp[g_current_lamp_index].setCurrentColor(time_color_map[g_time_color_map_position].color_index_from);
+         #ifdef TRACE_COUNTDOWN
+            Serial.print(F(" FR: ")); Serial.println(time_color_map[g_time_color_map_position].color_index_from);
+         #endif 
+      }
+      g_picture_lamp[g_current_lamp_index].setTargetColor(0.0,0.0,0.0);
+      g_picture_lamp[g_current_lamp_index].startTransition(LAMP_FADE_DURATION);
+      if(++g_current_lamp_index>=LAMP_COUNT) { 
+        g_current_lamp_index=0;
+        #ifdef TRACE_COUNTDOWN
+          Serial.println(F("-----"));
+        #endif
+      }
+    }
+
     // Finally calculate and propagate new lamp values
     for(int i=0;i<LAMP_COUNT;i++) 
     {
-         g_picture_lamp[i].setCurrentColor(1.0,0.0,0.0); // red
-         g_picture_lamp[i].setTargetColor(0.0,0.0,0.0);
-         g_picture_lamp[i].startTransition(LAMP_FADE_DURATION);
          g_picture_lamp[i].updateOutput(i);
     }
     output_show();
@@ -238,7 +283,7 @@ void enter_TEST_MODE_FADE_SOLO()
     g_process_mode=TEST_MODE_FADE_SOLO;
     input_IgnoreUntilRelease();
     digitalWrite(LED_BUILTIN, false);
-    g_pic_index=0;
+    g_current_lamp_index=0;
     for(int i=0;i<LAMP_COUNT;i++)  output_setPixelColor(i,0,0,0);  // shut down all lights
     output_show();
 }
@@ -257,11 +302,11 @@ void process_TEST_MODE_FADE_SOLO()
         enter_TEST_MODE_SCALING();
         return;
       }
-      output_setPixelColor(g_pic_index,0,0,0); // Shut down current light
-      if(++g_pic_index>=LAMP_COUNT) g_pic_index=0;
+      output_setPixelColor(g_current_lamp_index,0,0,0); // Shut down current light
+      if(++g_current_lamp_index>=LAMP_COUNT) g_current_lamp_index=0;
     }
 
-    output_setPixelColor(g_pic_index,red,green,blue);
+    output_setPixelColor(g_current_lamp_index,red,green,blue);
     output_show();
 }
 
@@ -276,7 +321,7 @@ void enter_TEST_MODE_SCALING()
     g_process_mode=TEST_MODE_SCALING;
     input_IgnoreUntilRelease();
     digitalWrite(LED_BUILTIN, false);
-    g_pic_index=0;
+    g_current_lamp_index=0;
     for(int i=0;i<LAMP_COUNT;i++)  output_setPixelColor(i,0,0,0);  // shut down all lights
     output_show();
 }
@@ -302,7 +347,7 @@ void process_TEST_MODE_SCALING()
     }
     
     for(int i=0;i<LAMP_COUNT;i++) {
-      if (i<=g_pic_index) output_setPixelColor(i,red,green,blue); // Shut down current light
+      if (i<=g_current_lamp_index) output_setPixelColor(i,red,green,blue); // Shut down current light
       else output_setPixelColor(i,0,0,0); 
     }
     output_show();
