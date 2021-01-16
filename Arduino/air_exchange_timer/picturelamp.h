@@ -4,7 +4,9 @@
 enum transition_type_t {TT_NONE,TT_ON,TT_OFF,TT_BLEND};
 
 #define PL_COLOR_BLACK 0
+#define PL_COLOR_BLUE_DIMMED 8
 #define PL_COLOR_CYAN  3
+#define PL_COLOR_GREEN_DIMMED 7
 #define PL_COLOR_PINK  2
 #define PL_COLOR_WHITE 1
 
