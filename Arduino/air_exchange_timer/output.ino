@@ -1,3 +1,10 @@
+/*
+ * This module manages the NeoPixel LED 
+ * Neo Pixels can be attached in multiple chains (currently only with same length) that are virtually coupled into one indexed pixel array
+ * A second layer provides a logical lamp address, to compensate reordering in the physical layout
+ */
+
+
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
   #include <avr/power.h>
@@ -12,15 +19,13 @@
 
 #define CHAIN_PIN_1 3
 
-
-
-
 #define NUMCHAINS 1
 #define NUMPIXELS 3
 #define PIXEL_BRIGHTNESS 255
+
 Adafruit_NeoPixel light_chain[1]={ Adafruit_NeoPixel(NUMPIXELS, CHAIN_PIN_1, NEO_RGB + NEO_KHZ800)};
 
-/* This map translates the picture light index in to the physical light index 
+/* This map translates the lamp index in to the physical pixiel index 
    an must be adapted to the current physical setup
  */
 byte output_lamp_to_pixel_map[3]={ 0, 1,2 };

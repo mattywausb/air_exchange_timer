@@ -20,8 +20,9 @@ float picturelamp_color_palette[][3]={
           {1    ,0.0 ,0  },  //4 = red
           {1    ,0.3 ,0  },  //5 = orange
           {1    ,0.7 ,0  },  //6 = yellow
-          {0    ,0.5   ,0  },  //7 = green dimmed
-          {0    ,0   ,0.1  },  //8 = blue dimmed
+          {0    ,1   ,0  },  //7 = green
+          {0    ,0.15 ,0  },  //8 = green_medium
+          {0    ,0.05 ,0  },  //9 = green_dimmed
 };
 
 PictureLamp::PictureLamp()

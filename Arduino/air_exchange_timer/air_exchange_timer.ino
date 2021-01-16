@@ -23,7 +23,7 @@
 
 #define WINDOW_ANIMATION_PULSE_DURATION 3000
 #define WINDOW_ANIMATION_FADE_DURATION  2800
-#define IDLE_FADE_DURATION 3500
+#define IDLE_FADE_DURATION 4500
 
 
 #define LAMP_COUNT 3
@@ -53,6 +53,7 @@ int g_step_index=0;
 
 PictureLamp g_picture_lamp[LAMP_COUNT];
 int g_current_lamp_index=0;
+int g_variation_index=0;
 
 
 
@@ -89,12 +90,17 @@ void setup() {
  
   input_switches_scan_tick();
   if(input_button_0_IsPressed()) { enter_TEST_MODE_FADE_SOLO(); return;}
-  //play_power_on_animation();
-  enter_COUNTDOWN_MODE();
+  play_power_on_animation();
+  enter_IDLE_MODE();
+  //enter_COUNTDOWN_MODE();
   //enter_WINDOW_OPEN_MODE();
+  //enter_TEST_MODE_SCALING();
 }
 
 /* **************** LOOP ******************************* */
+/* **************** LOOP ******************************* */
+/* **************** LOOP ******************************* */
+
 void loop() 
 {
    input_switches_scan_tick();
@@ -107,6 +113,11 @@ void loop()
     case TEST_MODE_SCALING: process_TEST_MODE_SCALING();break;
    } // switch
 }
+
+/* **************** MODE Implementations  ******************************************************* */
+/* **************** MODE Implementations  ******************************************************* */
+/* **************** MODE Implementations  ******************************************************* */
+
 
 /* ========= IDLE_MODE ======== */
 void enter_IDLE_MODE()
@@ -143,13 +154,21 @@ void process_IDLE_MODE()
 
     // Foreward Anmiation
     unsigned long current_time=millis();
-    if((current_time-g_mode_last_action_time)>IDLE_FADE_DURATION) {  
+    if((current_time-g_mode_last_action_time)>=IDLE_FADE_DURATION) {  
       g_mode_last_action_time=current_time;
 
-      if(g_step_index==0)  g_picture_lamp[2].setTargetColor(PL_COLOR_GREEN_DIMMED);
-      else g_picture_lamp[2].setTargetColor(PL_COLOR_BLACK); 
+      if(g_step_index==0)  {
+        g_picture_lamp[2].setTargetColor(PL_COLOR_GREEN_MEDIUM);
+        //g_picture_lamp[1].setTargetColor(PL_COLOR_GREEN_MEDIUM);
+      }
+      
+      else {
+        g_picture_lamp[2].setTargetColor(PL_COLOR_GREEN_DIMMED); 
+        //g_picture_lamp[1].setTargetColor(PL_COLOR_GREEN_DIMMED); 
+      }
 
       g_picture_lamp[2].startTransition(IDLE_FADE_DURATION-50); // Smoothly
+      g_picture_lamp[1].startTransition(IDLE_FADE_DURATION-50); // Smoothly
       if(++g_step_index>=2) g_step_index=0;
     }
 
@@ -355,9 +374,18 @@ void enter_TEST_MODE_SCALING()
     g_process_mode=TEST_MODE_SCALING;
     input_IgnoreUntilRelease();
     digitalWrite(LED_BUILTIN, false);
+
+    for(int i=0;i<LAMP_COUNT;i++) 
+    {
+         g_picture_lamp[i].setCurrentColor(PL_COLOR_BLACK); // All Lamps off
+    }  
+  
+    g_mode_start_time=millis();
+    g_mode_last_action_time=g_mode_start_time-IDLE_FADE_DURATION; 
+    g_step_index=0;
     g_current_lamp_index=0;
-    for(int i=0;i<LAMP_COUNT;i++)  output_setPixelColor(i,0,0,0);  // shut down all lights
-    output_show();
+    g_variation_index=1;
+
 }
 
 void process_TEST_MODE_SCALING()
@@ -378,12 +406,41 @@ void process_TEST_MODE_SCALING()
           enter_TEST_MODE_FADE_SOLO();
           return;
         }
-        if(++g_current_lamp_index>=LAMP_COUNT)g_current_lamp_index=0;
+        // No long press, so step to next lamp/variation
+        if(++g_current_lamp_index>=LAMP_COUNT) {
+          g_current_lamp_index=0;
+          if(++g_variation_index>=2) g_variation_index=0;
+        }
+        
+        for(int i=0;i<LAMP_COUNT;i++)  {
+              g_picture_lamp[i].setCurrentColor(PL_COLOR_BLACK); // All Lamps off
+        } 
+        g_step_index=0;
+        g_mode_last_action_time=current_time-IDLE_FADE_DURATION; // Trigger next to set lamp targets
+    }
+
+    if((current_time-g_mode_last_action_time)>=IDLE_FADE_DURATION) { // Set next lamp targets
+        g_mode_last_action_time=current_time;
+        for(int i=0;i<LAMP_COUNT;i++) {
+         if(i<= g_current_lamp_index && g_step_index%2==0) {
+          switch(g_variation_index){
+            case 0: g_picture_lamp[i].setTargetColor(PL_COLOR_WHITE );
+                   break;
+            case 1: g_picture_lamp[i].setTargetColor(PL_COLOR_GREEN );
+                   break;
+           }
+         }
+         else g_picture_lamp[i].setTargetColor(PL_COLOR_BLACK);
+         
+         g_picture_lamp[i].startTransition(IDLE_FADE_DURATION-50);
+        }
+        if(++g_step_index>=2) g_step_index=0;
     }
     
-    for(int i=0;i<LAMP_COUNT;i++) {
-      if (i<=g_current_lamp_index) output_setPixelColor(i,red,green,blue); // Shut down current light
-      else output_setPixelColor(i,0,0,0); 
+    // Finally calculate and propagate new lamp values
+    for(int i=0;i<LAMP_COUNT;i++) 
+    {
+         g_picture_lamp[i].updateOutput(i);
     }
     output_show();
 }
