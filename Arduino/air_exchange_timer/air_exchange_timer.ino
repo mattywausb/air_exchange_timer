@@ -24,13 +24,10 @@
 #define WINDOW_ANIMATION_PULSE_DURATION 3000
 #define WINDOW_ANIMATION_FADE_DURATION  2800
 #define IDLE_FADE_DURATION 4500
+#define IDLE_LAMP 2
 
 
 #define LAMP_COUNT 3
-
-#define iRED 0
-#define iGREEN 1
-#define iBLUE 2
 
 #define ACTIVTATION_PRESS_TIME 700
 
@@ -134,11 +131,12 @@ void enter_IDLE_MODE()
     
     for(int i=0;i<LAMP_COUNT;i++) 
     {
-         g_picture_lamp[i].setTargetColor(PL_COLOR_BLACK); // All Lamps off
-         g_picture_lamp[i].startTransition(IDLE_FADE_DURATION/4); // Smoothly
+         if(i==IDLE_LAMP) g_picture_lamp[IDLE_LAMP].setTargetColor(PL_COLOR_GREEN_DIMMED);
+         else g_picture_lamp[i].setTargetColor(PL_COLOR_BLACK); // All Lamps off
+         g_picture_lamp[i].startTransition(IDLE_FADE_DURATION/8); // Smoothly
      }
     g_mode_start_time=millis();
-    g_mode_last_action_time=g_mode_start_time-(IDLE_FADE_DURATION-IDLE_FADE_DURATION/4); 
+    g_mode_last_action_time=g_mode_start_time; 
     g_step_index=0;
 }
 
@@ -158,21 +156,20 @@ void process_IDLE_MODE()
       g_mode_last_action_time=current_time;
 
       if(g_step_index==0)  {
-        g_picture_lamp[2].setTargetColor(PL_COLOR_GREEN_MEDIUM);
+        g_picture_lamp[IDLE_LAMP].setTargetColor(PL_COLOR_GREEN_MEDIUM);
         //g_picture_lamp[1].setTargetColor(PL_COLOR_GREEN_MEDIUM);
       }
       
       else {
-        g_picture_lamp[2].setTargetColor(PL_COLOR_GREEN_DIMMED); 
+        g_picture_lamp[IDLE_LAMP].setTargetColor(PL_COLOR_GREEN_DIMMED); 
         //g_picture_lamp[1].setTargetColor(PL_COLOR_GREEN_DIMMED); 
       }
 
-      g_picture_lamp[2].startTransition(IDLE_FADE_DURATION-50); // Smoothly
-      g_picture_lamp[1].startTransition(IDLE_FADE_DURATION-50); // Smoothly
+      g_picture_lamp[IDLE_LAMP].startTransition(IDLE_FADE_DURATION-50); // Smoothly
       if(++g_step_index>=2) g_step_index=0;
     }
 
-     // Finally calculate and propagate new lamp values
+    // Finally calculate and propagate new lamp values
     for(int i=0;i<LAMP_COUNT;i++) 
     {
       if(g_picture_lamp[i].is_transition_in_progess()) g_picture_lamp[i].updateOutput(i);
